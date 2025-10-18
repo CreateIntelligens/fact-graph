@@ -1,3 +1,7 @@
+# by CSL
+.env
+.claude
+
 # sbt
 target/
 

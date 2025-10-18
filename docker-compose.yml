@@ -1,0 +1,92 @@
+services:
+  # Nginx 反向代理 - 統一入口
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: fact-graph-nginx
+    ports:
+      - "8897:8897"  # 對外統一端口
+    depends_on:
+      - fact-graph
+      - llm-api
+    networks:
+      - fact-graph-network
+
+  # Fact Graph 核心服務
+  fact-graph:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: irs-fact-graph
+    expose:
+      - "8897"  # 只對內部網路開放
+    volumes:
+      - ./:/fact-graph
+    working_dir: /fact-graph
+    stdin_open: true
+    tty: true
+    networks:
+      - fact-graph-network
+    command: |
+      bash -c "
+        set -euo pipefail
+        echo '========================================='
+        echo 'IRS Fact Graph - 美國稅務知識圖譜'
+        echo '========================================='
+        echo ''
+        echo '正在編譯 ScalaJS 模組 (sbt fastOptJS)...'
+        echo ''
+        sbt fastOptJS
+        cp js/target/scala-*/factgraph-fastopt/main.mjs demo/fg.js
+        echo ''
+        echo '編譯完成，啟動 Demo 伺服器...'
+        echo ''
+        echo '訪問: http://localhost:8897'
+        echo ''
+        echo '使用方式:'
+        echo '1. 開啟瀏覽器訪問 http://localhost:8897'
+        echo '2. 點擊「Load Fact Dictionary」'
+        echo '3. 選擇 all-facts.xml 檔案'
+        echo '4. 開始查詢稅務規則!'
+        echo ''
+        echo '========================================='
+        cd demo && python3 -m http.server 8897
+      "
+
+  # LLM API 服務
+  llm-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.llm
+    container_name: fact-graph-llm-api
+    expose:
+      - "8000"  # 只對內部網路開放
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - FACT_GRAPH_URL=http://fact-graph:8897
+    volumes:
+      - ./llm-integration:/app
+      - ./demo:/fact-graph/demo
+    working_dir: /app
+    depends_on:
+      - fact-graph
+    networks:
+      - fact-graph-network
+    command: |
+      bash -c "
+        echo '========================================='
+        echo '🤖 LLM API 服務啟動中...'
+        echo '========================================='
+        echo ''
+        echo 'API 端點: http://localhost:8000'
+        echo 'API 文檔: http://localhost:8000/docs'
+        echo '聊天界面: http://localhost:8000/chat'
+        echo ''
+        echo '========================================='
+        python api_server.py
+      "
+
+networks:
+  fact-graph-network:
+    driver: bridge

@@ -1,0 +1,13 @@
+# Python 依賴套件
+
+# LLM - Google Agent Development Kit (必須先安裝)
+google-adk>=1.16.0
+
+# Web 框架 (使用較新版本以相容 google-adk)
+fastapi>=0.115.0
+uvicorn>=0.30.0
+python-multipart>=0.0.6
+
+# 其他工具
+pydantic>=2.8.0
+python-dotenv>=1.0.0
